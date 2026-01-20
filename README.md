@@ -1,6 +1,6 @@
 ## Workspace（原 Datastream）下載 Excel 須知
 
-用 Excel 下載 Workspace（原 Datastream）的教學，請參考：
+用 Excel 下載 Workspace（原 Datastream）的教學，請參考：[Workspace(原Datastream) Data Collection SOP](https://drive.google.com/file/d/1gW6l87DrgSTm3RZfPdKsc6xqmHRGRZBR/view?usp=drive_link)
 
 由於 Workspace（原 Datastream）有下載限制，無法一次輸出多國多年資料，甚至有些變數太多的國家同一年也沒辦法一次載下來，所以需要分段下載後，再利用本工具做資料整合。
 
