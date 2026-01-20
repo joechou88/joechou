@@ -1,4 +1,6 @@
-data
-data-2015-2024
-data-split-by-variable
-data-split-by-variable-all
+# 先忽略「所有 Excel」
+*.xlsx
+*.xlsm
+
+# 例外：允許根目錄的 country-code.xlsx 被追蹤
+!country-code.xlsx
