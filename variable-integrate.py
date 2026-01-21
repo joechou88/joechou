@@ -185,18 +185,8 @@ def append_column(out_path, df, sheet_name):
     rows_to_write = dataframe_to_rows(df.iloc[:, 1:], index=False, header=True)
     
     for r_idx, row in enumerate(rows_to_write, start=1):
-        for c_idx, v in enumerate(row, start=new_col_idx):
-            cell = ws.cell(row=r_idx, column=c_idx)  # 先抓目標 cell
-            sheet_name = ws.title
-
-            if cell.is_date and isinstance(v, (int, float)):
-                if v > 300000000:
-                    print(
-                        f"⚠️ Invalid Excel date → replaced with '.' | "
-                        f"sheet={sheet_name}, row={r_idx}, col={c_idx}, value={v}"
-                    )
-                    v = "."
-            cell.value = v
+        for c_idx, value in enumerate(row, start=new_col_idx):
+            ws.cell(row=r_idx, column=c_idx, value=value)
 
     wb.save(out_path)
 
