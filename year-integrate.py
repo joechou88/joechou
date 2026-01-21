@@ -142,8 +142,8 @@ for country, files in country_files.items():
         continue
 
     # ---- 加 COUNTRY / COUNTRY_CODE / COUNTRY_CODE2 ----
-    code_info = country_code_map.get(display_country, {"Contry_code": "", "Country_code2": ""})
-    country_code = code_info.get("Contry_code", "")
+    code_info = country_code_map.get(display_country, {"Country_code": "", "Country_code2": ""})
+    country_code = code_info.get("Country_code", "")
     country_code2 = code_info.get("Country_code2", "")
 
     # 調整 header，把三欄插到 YEAR 之後
