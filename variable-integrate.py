@@ -36,9 +36,8 @@ def create_output_file(country, start_year, end_year):
     out_path = os.path.join(DATA_OUT, fname)
 
     if os.path.exists(out_path):
-        print(f"⚠️ 警告：{out_path} 已存在，將直接追加資料")
-        wb = load_workbook(out_path)
-        return out_path
+        print(f"⏭️ {out_path} 已存在，若要重新輸出請手動至 ./data 刪除該檔")
+        return None
     
     files = [f for f in os.listdir(DATA_SRC) if f.endswith((".xlsx", ".xlsm"))]
 
@@ -186,8 +185,18 @@ def append_column(out_path, df, sheet_name):
     rows_to_write = dataframe_to_rows(df.iloc[:, 1:], index=False, header=True)
     
     for r_idx, row in enumerate(rows_to_write, start=1):
-        for c_idx, value in enumerate(row, start=new_col_idx):
-            ws.cell(row=r_idx, column=c_idx, value=value)
+        for c_idx, v in enumerate(row, start=new_col_idx):
+            cell = ws.cell(row=r_idx, column=c_idx)  # 先抓目標 cell
+            sheet_name = ws.title
+
+            if cell.is_date and isinstance(v, (int, float)):
+                if v > 300000000:
+                    print(
+                        f"⚠️ Invalid Excel date → replaced with '.' | "
+                        f"sheet={sheet_name}, row={r_idx}, col={c_idx}, value={v}"
+                    )
+                    v = "."
+            cell.value = v
 
     wb.save(out_path)
 
@@ -219,6 +228,8 @@ def main():
 
         for start_year, end_year in year_span_list:
             out_xlsx = create_output_file(country, start_year, end_year)
+            if out_xlsx is None:
+                continue   # 這個年度已做過，直接跳過
             skip_country = False
 
             # 篩選這個 block 的檔案
