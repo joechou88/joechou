@@ -24,7 +24,10 @@
    `./data → ./data-2015-2024`
 
 3. **整合所有國家資料（`country-integrate.py`）**  
-   `./data-2015-2024 → ./all-countries.xlsx`
+   `./data-2015-2024 → ./all-countries.csv`
+
+4. **重新命名欄位（`rename-columns.py`）**  
+   `./all-countries.csv → ./all-countries-renamed.csv`
 
 ---
 
@@ -47,3 +50,13 @@
 
 - **國家-年分**（僅單一年份）  
   - 例：`Finland-2021`
+
+---
+
+## 重新命名欄位
+    1. Type               → DSCD
+    2. X(WC01254)         → WC01254
+    3. X(WC06705)~U       → XWC06705U
+    4. X(WC02051)~U$.1    → XWC02051U
+    5. X(WC18545)~U$      → XWC18545U
+    6. X(WC04601)~US      → XWC04601U
