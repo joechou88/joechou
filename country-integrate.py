@@ -22,8 +22,8 @@ final_excel_name = "all-countries.xlsx"
 output_excel_path = os.path.join(base_path, final_excel_name)
 
 # 4. 暫存檔與紀錄檔
-temp_csv_name = "temp_merged_data.csv"
-output_csv_path = os.path.join(base_path, temp_csv_name)
+final_csv_name = "all-countries.csv"
+output_csv_path = os.path.join(base_path, final_csv_name)
 
 log_file_name = "processed_log.txt"
 log_path = os.path.join(base_path, log_file_name)
