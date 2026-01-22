@@ -111,19 +111,18 @@ print(f"本次新增合併 {count} 個檔案。")
 
 # ================= 轉存 Excel =================
 if os.path.exists(output_csv_path):
-    print(f"正在建立最終檔案: {final_excel_name}...")
-    try:
-        df_final = pd.read_csv(output_csv_path, dtype=str)
-        df_final.to_excel(output_excel_path, index=False)
-        print(f"\n★ 成功！檔案位置: {output_excel_path}")
-        
-        # 合併完成後刪除暫存 CSV (保持乾淨)
-        # os.remove(output_csv_path) 
-        
-    except Exception as e:
-        print(f"轉存 Excel 失敗: {e}")
+    print(f"即將建立最終檔案: {final_excel_name}，可能會花幾分鐘...")
+    
+    user_input = input("是否要轉存為 Excel？(y/n): ").strip().lower()
+    if user_input == "y":
+        try:
+            df_final = pd.read_csv(output_csv_path, dtype=str)  # 指定型態為字串，避免 DtypeWarning
+            df_final.to_excel(output_excel_path, index=False)
+            print(f"\n★ 成功！檔案位置: {output_excel_path}")
+        except Exception as e:
+            print(f"轉存 Excel 失敗: {e}")
+    else:
+        print("跳過轉存 Excel，只輸出 CSV 檔案。")
 else:
     if count == 0:
         print("沒有新檔案需要合併。")
-
-input("\n程式執行完畢，按 Enter 離開...")
