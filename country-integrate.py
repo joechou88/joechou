@@ -65,7 +65,7 @@ for filename in all_files:
     print(f"正在合併: {file_basename}")
     
     try:
-        df = pd.read_excel(filename)
+        df = pd.read_excel(filename, dtype=str,  engine="openpyxl")
         df = df.loc[:, ~df.columns.str.contains('^Unnamed')]  # 去掉多餘的空白欄
         print(f"{file_basename}: {len(df.columns)} 欄")
         
