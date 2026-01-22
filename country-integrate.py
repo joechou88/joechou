@@ -28,6 +28,30 @@ output_csv_path = os.path.join(base_path, temp_csv_name)
 log_file_name = "processed_log.txt"
 log_path = os.path.join(base_path, log_file_name)
 
+# ================= 檢查舊檔案 =================
+existing_files = []
+for f in [output_excel_path, log_path, output_csv_path]:
+    if os.path.exists(f):
+        existing_files.append(f)
+
+if existing_files:
+    print("偵測到以下舊檔案可能是上次執行時產生的：")
+    for f in existing_files:
+        print(f" - {f}")
+    
+    choice = input("你想刪除這些檔案並重新執行嗎？(y/n): ").strip().lower()
+    if choice == 'y':
+        for f in existing_files:
+            try:
+                os.remove(f)
+                print(f"已刪除: {f}")
+            except Exception as e:
+                print(f"[錯誤] 無法刪除 {f}: {e}")
+    else:
+        print("程式已停止，保留舊檔案以避免覆寫。")
+        sys.exit()
+
+
 # ==========================================
 
 print(f"程式位置: {base_path}")
@@ -65,7 +89,7 @@ for filename in all_files:
     print(f"正在合併: {file_basename}")
     
     try:
-        df = pd.read_excel(filename, dtype=str,  engine="openpyxl")
+        df = pd.read_excel(filename, dtype=str)
         df = df.loc[:, ~df.columns.str.contains('^Unnamed')]  # 去掉多餘的空白欄
         print(f"{file_basename}: {len(df.columns)} 欄")
         
@@ -89,7 +113,7 @@ print(f"本次新增合併 {count} 個檔案。")
 if os.path.exists(output_csv_path):
     print(f"正在建立最終檔案: {final_excel_name}...")
     try:
-        df_final = pd.read_csv(output_csv_path)
+        df_final = pd.read_csv(output_csv_path, dtype=str)
         df_final.to_excel(output_excel_path, index=False)
         print(f"\n★ 成功！檔案位置: {output_excel_path}")
         
