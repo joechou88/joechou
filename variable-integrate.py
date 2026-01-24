@@ -18,14 +18,18 @@ def parse_filename(fname):
     回傳 (country, year_start, year_end, variable_tag)
     """
     name = os.path.splitext(fname)[0]
-    m = re.match(r"(.+?)-(\d{4})(?:-(\d{4}))?([A-Z])$", name)
+    m = re.match(r"(.+?)-(\d{4})(?:-(\d{4}))?([A-Z]+)$", name)
 
     if not m:
         return None
 
-    country, y1, y2, var = m.groups()
+    country, y1, y2, vars_ = m.groups()
     y2 = y2 if y2 else y1
-    return country, int(y1), int(y2), var
+
+    return [
+        (country, int(y1), int(y2), var, fname)
+        for var in vars_
+    ]
 
 def create_output_file(country, start_year, end_year):
     if end_year == start_year:
@@ -69,7 +73,7 @@ def find_excel_file(country, start_year, var_tag, files):
     """
     # 精確匹配 country-startyear(-endyear)var_tag
     pattern = re.compile(
-        rf"^{re.escape(country)}-{start_year}(?:-\d{{4}})?{var_tag}\.(xlsx|xlsm)$"
+        rf"^{re.escape(country)}-{start_year}(?:-\d{{4}})?[A-Z]*{var_tag}[A-Z]*\.(xlsx|xlsm)$"
     )
     candidates = [f for f in files if pattern.match(f)]
 
@@ -193,14 +197,15 @@ def append_column(out_path, df, sheet_name):
 def main():
     files = [f for f in os.listdir(DATA_SRC) if f.endswith((".xlsx", ".xlsm"))]
 
-    parsed = [parse_filename(f) for f in files]
-    parsed = [p for p in parsed if p is not None]
+    parsed = []
+    for f in files:
+        parsed.extend(parse_filename(f))
 
     # 依國家 -> 年度 -> 變數排序（A, B, C...）
     grouped = defaultdict(lambda: defaultdict(list))  # country -> year -> list of (var, fname)
     country_year_spans = defaultdict(list)
-
-    for (country, y1, y2, var), fname in zip(parsed, files):
+    
+    for country, y1, y2, var, fname in parsed:
         country_year_spans[country].append((y1, y2))
         for y in range(y1, y2 + 1):
             grouped[country][y].append((var, fname))
@@ -225,15 +230,22 @@ def main():
             # 篩選這個 block 的檔案
             block_files = [
                 (y1, y2, var, fname)
-                for (parsed_country, y1, y2, var), fname in zip(parsed, files)
+                for parsed_country, y1, y2, var, fname in parsed
                 if parsed_country == country and y1 >= start_year and y2 <= end_year
             ]
-            block_files = sorted(block_files, key=lambda x: x[2])  # A/B/C 排序
+            block_files = sorted(block_files, key=lambda x: x[2])  # A/B/C 排序，以第一個最小字母先處理
+            
+            processed_files = set() # 記錄已處理 Excel
 
             for s, e, var, _ in block_files:
                 fname = find_excel_file(country, s, var, files)
+                if fname in processed_files:
+                    continue  # 否則 Hong-Kong-2015CD 會被併 2 次
+                processed_files.add(fname)  # 標記 Hong-Kong-2015CD 已處理
+
                 src_path = os.path.join(DATA_SRC, fname)
-                is_first_variable = (var == "A")
+                vars_in_file = [v for _, _, v, f in block_files if f == fname]
+                is_first_variable = ("A" in vars_in_file)
                 print(f"📂 處理 {src_path}")
 
                 req_df = read_request_table(src_path)
