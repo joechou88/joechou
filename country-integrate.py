@@ -85,12 +85,12 @@ for filename in all_files:
     if file_basename.startswith("~$"): continue
     if file_basename in processed_files: continue
     # =============
-
-    print(f"正在合併: {file_basename}: {len(df.columns)} 欄")
     
     try:
         df = pd.read_excel(filename, dtype=str)
         df = df.loc[:, ~df.columns.str.contains('^Unnamed')]  # 去掉多餘的空白欄
+
+        print(f"正在合併: {file_basename} ({len(df.columns)} 欄)")
         
         # 寫入 CSV (存放在外面那一層，避免汙染資料夾)
         file_exists = os.path.isfile(output_csv_path)
