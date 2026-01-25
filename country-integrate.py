@@ -17,41 +17,6 @@ else:
 target_folder_name = "data-2015-2024"
 input_path = os.path.join(base_path, target_folder_name)
 
-# 3. 設定輸出檔名 (存放在腳本旁邊，也就是 datastream 資料夾)
-final_excel_name = "all-countries.xlsx"
-output_excel_path = os.path.join(base_path, final_excel_name)
-
-# 4. 暫存檔與紀錄檔
-final_csv_name = "all-countries.csv"
-output_csv_path = os.path.join(base_path, final_csv_name)
-
-log_file_name = "processed_log.txt"
-log_path = os.path.join(base_path, log_file_name)
-
-# ================= 檢查舊檔案 =================
-existing_files = []
-for f in [output_excel_path, log_path, output_csv_path]:
-    if os.path.exists(f):
-        existing_files.append(f)
-
-if existing_files:
-    print("偵測到以下舊檔案可能是上次執行時產生的：")
-    for f in existing_files:
-        print(f" - {f}")
-    
-    choice = input("你想刪除這些檔案並重新執行嗎？(y/n): ").strip().lower()
-    if choice == 'y':
-        for f in existing_files:
-            try:
-                os.remove(f)
-                print(f"已刪除: {f}")
-            except Exception as e:
-                print(f"[錯誤] 無法刪除 {f}: {e}")
-    else:
-        print("程式已停止，保留舊檔案以避免覆寫。")
-        sys.exit()
-
-
 # ==========================================
 
 print(f"程式位置: {base_path}")
@@ -67,46 +32,82 @@ if not os.path.exists(input_path):
     input("按 Enter 離開...")
     sys.exit()
 
-# 讀取「已完成清單」
-processed_files = set()
-if os.path.exists(log_path):
-    with open(log_path, "r", encoding="utf-8") as f:
-        processed_files = set(line.strip() for line in f)
+all_files = [f for f in glob.glob(os.path.join(input_path, "*.xlsx"))
+             if not os.path.basename(f).startswith("~$")]
 
-# 抓取 target_folder_name 內所有的 .xlsx
-all_files = glob.glob(os.path.join(input_path, "*.xlsx"))
-print(f"發現 {len(all_files)} 個 Excel 檔案。")
+count = len(all_files)
+print(f"發現 {count} 個 Excel 檔案。")
 
-count = 0
-for filename in all_files:
-    file_basename = os.path.basename(filename)
+if count > 0:
+    final_excel_name = f"all-{count}countries.xlsx"
+    final_csv_name   = f"all-{count}countries.csv"
+    log_file_name    = f"all-{count}countries_processed_log.txt"
+
+    output_excel_path = os.path.join(base_path, final_excel_name)
+    output_csv_path   = os.path.join(base_path, final_csv_name)
+    log_path          = os.path.join(base_path, log_file_name)
+
+    final_files = [
+        output_excel_path,
+        output_csv_path,
+        log_path
+    ]
+
+    existing_files = [f for f in final_files if os.path.exists(f)]
+
+    if existing_files:
+        print("偵測到以下舊檔案，可能是上次執行時產生的：")
+        for f in existing_files:
+            print(f" - {os.path.basename(f)}")
+
+        ans = input("是否要覆寫這些檔案？(y/n): ").strip().lower()
+        if ans != "y":
+            print("取消操作，保留舊檔案以避免覆寫。")
+            sys.exit()
+        else:
+            for f in existing_files:
+                try:
+                    os.remove(f)
+                    print(f"已刪除舊檔：{os.path.basename(f)}")
+                except Exception as e:
+                    print(f"[錯誤] 無法刪除 {f}: {e}")
     
-    # === 過濾區 ===
-    if file_basename.startswith("~$"): continue
-    if file_basename in processed_files: continue
-    # =============
-    
-    try:
-        df = pd.read_excel(filename, dtype=str)
-        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]  # 去掉多餘的空白欄
+    # 讀取「已完成清單」
+    processed_files = set()
+    if os.path.exists(log_path):
+        with open(log_path, "r", encoding="utf-8") as f:
+            processed_files = set(line.strip() for line in f)
 
-        print(f"正在合併: {file_basename} ({len(df.columns)} 欄)")
+    actual_merge_count = 0
+    for filename in all_files:
+        file_basename = os.path.basename(filename)
         
-        # 寫入 CSV (存放在外面那一層，避免汙染資料夾)
-        file_exists = os.path.isfile(output_csv_path)
-        df.to_csv(output_csv_path, mode='a', index=False, header=not file_exists, encoding='utf-8-sig')
+        # === 過濾區 ===
+        if file_basename in processed_files:
+            continue
+        # =============
         
-        # 寫入 Log
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(file_basename + "\n")
+        try:
+            df = pd.read_excel(filename, dtype=str)
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]  # 去掉多餘的空白欄
+
+            print(f"正在合併: {file_basename} ({len(df.columns)} 欄)")
             
-        count += 1
-        
-    except Exception as e:
-        print(f"[錯誤] 讀取 {file_basename} 失敗: {e}")
+            # 寫入 CSV (存放在外面那一層，避免汙染資料夾)
+            file_exists = os.path.isfile(output_csv_path)
+            df.to_csv(output_csv_path, mode='a', index=False, header=not file_exists, encoding='utf-8-sig')
+            
+            # 寫入 Log
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(file_basename + "\n")
+                
+            actual_merge_count += 1
+            
+        except Exception as e:
+            print(f"[錯誤] 讀取 {file_basename} 失敗: {e}")
 
-print("-" * 30)
-print(f"本次新增合併 {count} 個檔案。")
+    print("-" * 30)
+    print(f"本次新增合併 {actual_merge_count} 個檔案。")
 
 # ================= 轉存 Excel =================
 if os.path.exists(output_csv_path):
