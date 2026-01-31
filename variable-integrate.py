@@ -31,17 +31,38 @@ def parse_filename(fname):
         for var in vars_
     ]
 
+def get_expected_output_files(parsed, country_year_spans):
+    outputs = {}  # out_path -> (country, year_label)
+
+    for country, spans in country_year_spans.items():
+        is_consistent, year_span_list = check_year_span_consistency(
+            country, spans
+        )
+        if not is_consistent:
+            continue
+
+        for start_year, end_year in year_span_list:
+            year_label = (
+                f"{start_year}"
+                if start_year == end_year
+                else f"{start_year}-{end_year}"
+            )
+            fname = f"{country}-{year_label}.xlsx"
+            out_path = os.path.join(DATA_OUT, fname)
+            outputs[out_path] = (country, year_label)
+
+    return outputs
+
 def create_output_file(country, start_year, end_year):
-    if end_year == start_year:
-        fname = f"{country}-{start_year}.xlsx"
-    else:
-        fname = f"{country}-{start_year}-{end_year}.xlsx"
+    year_label = (
+        f"{start_year}"
+        if start_year == end_year
+        else f"{start_year}-{end_year}"
+    )
+
+    fname = f"{country}-{year_label}.xlsx"
 
     out_path = os.path.join(DATA_OUT, fname)
-
-    if os.path.exists(out_path):
-        print(f"⏭️ {out_path} 已存在，若要重新輸出請手動至 ./data 刪除該檔")
-        return None
     
     files = [f for f in os.listdir(DATA_SRC) if f.endswith((".xlsx", ".xlsm"))]
 
@@ -209,6 +230,41 @@ def main():
         country_year_spans[country].append((y1, y2))
         for y in range(y1, y2 + 1):
             grouped[country][y].append((var, fname))
+    
+    # 檢查之前是否已輸出過
+    expected_outputs = get_expected_output_files(parsed, country_year_spans)
+
+    existing_outputs = {
+        path: meta
+        for path, meta in expected_outputs.items()
+        if os.path.exists(path)
+    }
+
+    if existing_outputs:
+        print("\n⚠️ 發現以下輸出檔已存在 ./data：")
+        for i, (path, (country, year_label)) in enumerate(existing_outputs.items(), 1):
+            print(f"{i}. {country} ({year_label}) → {os.path.basename(path)}")
+
+        while True:
+            ans = input(
+                "\n👉 是否【全部刪除】後重新產生？ (y/n): "
+            ).strip().lower()
+
+            if ans == "y":
+                for path in existing_outputs:
+                    print(f"🗑️ 刪除 {os.path.basename(path)}")
+                    os.remove(path)
+                break
+
+            elif ans == "n":
+                print(
+                    "\n⏭️ 未刪除任何檔案。\n"
+                    "請自行至 ./data 刪除欲重新產生的檔案後再執行。"
+                )
+                return
+
+            else:
+                print("請輸入 y 或 n")
 
     for country, spans in grouped.items():
 

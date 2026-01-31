@@ -3,6 +3,7 @@
 *.xlsm
 *.csv
 *.txt
+*.docx
 
 # 例外：允許根目錄的 country-code.xlsx 被追蹤
 !country-code.xlsx
