@@ -190,20 +190,25 @@ for country, files in country_files.items():
     # ---- 取得實際年份範圍 ----
     years_present = sorted({row[0] for row in new_records})
 
-    min_year = years_present[0]
-    max_year = years_present[-1]
+    # ---- 檢查年份完整性 ----
+    required_years = set(range(START_YEAR, END_YEAR + 1))
+    missing_required = sorted(required_years - set(years_present))
 
-    # ---- 檢查年份是否連續 ----
+    # ---- 檢查年份連續性 ----
+    min_year = min(years_present)
+    max_year = max(years_present)
     full_range = set(range(min_year, max_year + 1))
-    missing_years = sorted(full_range - set(years_present))
+    missing_continuous = sorted(full_range - set(years_present))
 
-    if missing_years:
-        missing_str = ", ".join(str(y) for y in missing_years)
-        print(
-            f"⚠ 年份不連續｜國家 {country} "
-            f"| 實際年份: {years_present} "
-            f"| 缺少年份: {missing_str}"
-        )
+    # ---- 若任一條件不符合就跳過 ----
+    if missing_required or missing_continuous:
+        msg = f"⚠ {country} 資料不完整或不連續｜實際年份: {years_present}"
+        if missing_required:
+            msg += f" | 年份不完整，缺少: {', '.join(str(y) for y in missing_required)}"
+        if missing_continuous:
+            msg += f" | 年份不連續，缺少: {', '.join(str(y) for y in missing_continuous)}"
+        print(msg)
+        continue  # 跳過該國家，不輸出
 
     # ---- 輸出主控表 ----
     out_wb = Workbook()
