@@ -8,7 +8,7 @@
 
 請將 Excel 檔案存放至：
 
-- 分公司 + 分年 + 分變數：`./data-split-by-equity`
+- 分公司 + 分年 + 分變數：`./data-split-by-entity`
 - 分年 + 分變數：`./data-split-by-variable`
 - 分年：`./data`
 
@@ -18,8 +18,8 @@
 
 本工具的資料整合流程如下：
 
-1. **同一國家多個公司合併（`equity-integrate.py`）**
-   `./data-split-by-equity → ./data-split-by-variable`
+1. **同一國家多個公司合併（`entity-integrate.py`）**
+   `./data-split-by-entity → ./data-split-by-variable`
 
 2. **同一國家多個變數合併（`variable-integrate.py`）**  
    `./data-split-by-variable → ./data`
