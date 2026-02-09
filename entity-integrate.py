@@ -83,7 +83,22 @@ def check_request_table(wb, fname, company_no, start, end):
             f"預期 {len(expected_years)} 列，實際 {year_idx} 列"
         )
 
-def validate_wb(wb, fname, company_no, start, end):
+def get_request_table_value(ws, col, start_row=7):
+    """
+    讀 REQUEST_TABLE 連續非空值（從 N7 / O7 開始）
+    回傳 list[int]
+    """
+    values = []
+    row = start_row
+    while ws[f"{col}{row}"].value not in (None, ""):
+        try:
+            values.append(int(ws[f"{col}{row}"].value))
+        except Exception:
+            values.append(None)
+        row += 1
+    return values
+
+def validate_wb(wb, fname, company_no, start, end, years):
     # ===== 確定 REQUEST_TABLE 存在 =====
     if REQUEST_SHEET not in wb.sheetnames:
         raise ValueError(f"{fname} 缺少 REQUEST_TABLE")
@@ -140,7 +155,7 @@ def actual_cols(ws):
     return max_cols
 
 # ================== row append ==================
-def append_sheet_rows(target_ws, source_ws, fname_only):
+def append_sheet_rows(target_ws, source_ws, fname_only, base_cols_by_year, src_cols_by_year, year_idx):
     """
     將 source_ws 的資料接到 target_ws 後面
     - 只允許欄位數一致
@@ -150,12 +165,18 @@ def append_sheet_rows(target_ws, source_ws, fname_only):
     source_cols = actual_cols(source_ws)
 
     if target_cols != source_cols:
-        print(f"⚠️ 跳過：{fname_only} 工作表 {source_ws.title} 欄位數不一致！"
-              f"target: {target_cols}, source: {source_cols}")
-        return  # 不 append
+        print(
+            f"❌ COLS 不一致 | "
+            f"{os.path.basename(target_ws.parent.properties.title)} "
+            f"O{7+year_idx}={base_cols_by_year[year_idx]} | "
+            f"{fname_only} O{7+year_idx}={src_cols_by_year[year_idx]}"
+        )
+        return False  # 不 append
 
     for row in source_ws.iter_rows(min_row=2, values_only=True):
         target_ws.append(row)
+    
+    return True
 
 # ================== 主流程 ==================
 try:
@@ -245,9 +266,18 @@ for (country, start, end, suffix), items in groups.items():
 
     wb_base = load_workbook(base_file, data_only=True)
     years = 1 if end is None else int(end) - int(start) + 1
+    merged_rows_by_year = [0] * years
 
-    validate_wb(wb_base, base_file, base_company, start, end)
+    validate_wb(wb_base, base_file, base_company, start, end, years)
     print_sheet_shapes(wb_base, companies[1])
+
+    # ===== 先計入 base company 自己的 rows =====
+    base_sheet_names = [s for s in wb_base.sheetnames if s != REQUEST_SHEET]
+
+    for year_idx, ws_name in enumerate(base_sheet_names):
+        ws = wb_base[ws_name]
+        rows = actual_rows(ws)
+        merged_rows_by_year[year_idx] += rows + 1
 
     for company in sorted(companies):
         if company == 1:
@@ -256,7 +286,14 @@ for (country, start, end, suffix), items in groups.items():
         fname = os.path.join(INPUT_FOLDER, fname_only)
         wb_src = load_workbook(fname, data_only=True)
 
-        validate_wb(wb_src, fname, company, start, end)
+        ws_req_base = wb_base[REQUEST_SHEET]
+        ws_req_src = wb_src[REQUEST_SHEET]
+
+        base_cols_by_year = get_request_table_value(ws_req_base, "O")
+        src_cols_by_year = get_request_table_value(ws_req_src, "O")
+
+
+        validate_wb(wb_src, fname, company, start, end, years)
 
         for ws_name in wb_base.sheetnames:
             # 跳過 REQUEST_TABLE
@@ -269,18 +306,31 @@ for (country, start, end, suffix), items in groups.items():
             rows = actual_rows(ws_src)
             cols = actual_cols(ws_src)
 
+            year_idx = list(
+                s for s in wb_base.sheetnames if s != REQUEST_SHEET
+            ).index(ws_name)
+
             print(
                 f"{fname_only} 🔹 工作表: {ws_name}, "
                 f"shape: {rows} rows x {cols} columns"
             )
-            append_sheet_rows(ws_base, ws_src, fname_only)
+
+            appended = append_sheet_rows(ws_base, ws_src, fname_only, base_cols_by_year, src_cols_by_year, year_idx)
+
+            if appended:
+                merged_rows_by_year[year_idx] += rows
 
     out_name = key_to_outname[(country, start, end, suffix)]
     out_path = os.path.join(OUTPUT_FOLDER, out_name)
 
     print(f"\n📊 {out_name} 最終合併後 sheet shape：")
     print_sheet_shapes(wb_base, out_name)
-                       
+    
+    # ===== 回寫 輸出檔 REQUEST_TABLE N 欄（Rows）=====
+    ws_req = wb_base[REQUEST_SHEET]
+    for i, total_rows in enumerate(merged_rows_by_year):
+        ws_req[f"N{7+i}"].value = total_rows
+
     wb_base.save(out_path)
     print(f"✔ 輸出完成：{out_path}")
     print(f"\n========================\n")
