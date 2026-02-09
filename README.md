@@ -23,6 +23,8 @@
 3. 【分年 + 分變數】（存放於 `./data-split-by-variable`）合併時，理想上同一國家同一年不同的分變數檔 Rows 數應一致，但實務上 Workspace 輸出時可能有些微差異。  
    以 South-Korea-2015 為例，South-Korea-2015D 相較 South-Korea-2015A、South-Korea-2015B、South-Korea-2015C 少了 Type1、Type2、Type3 三間公司的資料，這是因為這三間公司在 D 組變數剛好都是缺失值，Workspace 在輸出時會自動忽略這三間公司。
 
+   ![row-inconsistencty-when-integrating-variable](img/row-inconsistencty-when-integrating-variable.png)
+
    **解法：**  
    以 South-Korea-2015D 為例，找出少了哪 3 間公司，手動新增 3 rows 並全部補為遺失值，之後再重新執行變數合併（`variable-integrate.py`）。
 
