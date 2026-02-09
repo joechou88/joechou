@@ -33,29 +33,37 @@
 本工具的資料整合流程如下：
 
 1. **同一國家多個公司合併（`entity-integrate.py`）**
+
    `./data-split-by-entity → ./data-split-by-variable`
 
 2. **同一國家多個變數合併（`variable-integrate.py`）**  
+
    `./data-split-by-variable → ./data`
 
 3. **同一國家多年資料合併（`year-integrate.py`）**  
+
    `./data → ./data-2015-2024`
 
 4. **整合所有國家資料（`country-integrate.py`）**  
+
    `./data-2015-2024 → ./all-countries.csv`
 
 5. **重新命名欄位**  
-   1. `rename-columns-csv.py`: `./all-{國家數量}countries.csv → ./all-{國家數量}countries-renamed.csv`  
-   2. `rename-columns-xlsx.py`: `./all-{國家數量}countries.xlsx → ./all-{國家數量}countries-renamed.xlsx`
+
+   `rename-columns-csv.py`: `./all-{國家數量}countries.csv → ./all-{國家數量}countries-renamed.csv`  
+
+   `rename-columns-xlsx.py`: `./all-{國家數量}countries.xlsx → ./all-{國家數量}countries-renamed.xlsx`
 
 ---
 
 ## 其他實用工具
 
 1. **多個公司合併前，檢查檔案完整性（`check-completeness-before-entity-integrate.py`）**
+
    以 Germany 為例，我們預期檔案有 Germany1-2015A 到 Germany8-2024G 共 560 個，最後會列出所有缺失的檔名
 
-2. **多個變數合併前，檢查檔案完整性（`find-missing-entity-before-variable-integrate.py`）**
+3. **多個變數合併前，檢查檔案完整性（`find-missing-entity-before-variable-integrate.py`）**
+
    在解決「同一國家同一年不同的分變數檔 Rows 數不一致」的問題時，列出 變數組 X 相較 變數組 Y, 變數組 Z... 少了哪幾間公司，手動補缺失值後再執行 `variable-integrate.py`
 
 ---
@@ -67,26 +75,32 @@
 ### 【分年 + 分變數 + 分公司】（存放於 `./data-split-by-equity`）
 
 - **國家(第幾組公司)-開始年-結束年(第幾組變數)**  
-  - 例：`Germany1-2015-2018A`
+
+  例：`Germany1-2015-2018A`
 
 - **國家-年分(第幾組變數)**（僅單一年份）  
-  - 例：`Germany1-2015A`
+
+   例：`Germany1-2015A`
 
 ### 【分年 + 分變數】（存放於 `./data-split-by-variable`）
 
 - **國家-開始年-結束年(第幾組變數)**  
-  - 例：`Switzerland-2015-2018A`
+
+   例：`Switzerland-2015-2018A`
 
 - **國家-年分(第幾組變數)**（僅單一年份）  
-  - 例：`South-Korea-2015A`
+
+   例：`South-Korea-2015A`
 
 ### 【僅分年】（存放於 `./data`）
 
 - **國家-開始年-結束年**  
-  - 例：`Finland-2019-2020`
+
+   例：`Finland-2019-2020`
 
 - **國家-年分**（僅單一年份）  
-  - 例：`Finland-2021`
+
+   例：`Finland-2021`
 
 ---
 
