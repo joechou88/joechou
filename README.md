@@ -62,6 +62,8 @@
 
    以 Germany 為例，我們預期檔案有 Germany1-2015A 到 Germany8-2024G 共 560 個，最後會列出所有缺失的檔名
 
+   ![check-completeness-before-entity-integrate](img/check-completeness-before-entity-integrate.png)
+
 3. **多個變數合併前，檢查檔案完整性（`find-missing-entity-before-variable-integrate.py`）**
 
    在解決「同一國家同一年不同的分變數檔 Rows 數不一致」的問題時，列出 變數組 X 相較 變數組 Y, 變數組 Z... 少了哪幾間公司，手動補缺失值後再執行 `variable-integrate.py`
