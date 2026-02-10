@@ -174,6 +174,9 @@ def append_sheet_rows(target_ws, source_ws, fname_only, base_cols_by_year, src_c
         return False  # 不 append
 
     for row in source_ws.iter_rows(min_row=2, values_only=True):
+        # 跳過空白列
+        if not any(cell is not None for cell in row):
+            continue
         target_ws.append(row)
     
     return True

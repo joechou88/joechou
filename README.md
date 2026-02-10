@@ -66,7 +66,7 @@
 
    ![check-completeness-before-entity-integrate](img/check-completeness-before-entity-integrate.png)
 
-3. **多個變數合併前，檢查檔案完整性（`find-missing-entity-before-variable-integrate.py`）**
+3. **多個變數合併前，檢查分變數檔有沒有少公司（`find-missing-entity-before-variable-integrate.py`）**
 
    在解決「同一國家同一年不同的分變數檔 Rows 數不一致」的問題時，列出 變數組 X 相較 變數組 Y, 變數組 Z... 少了哪幾間公司，手動補缺失值後再執行 `variable-integrate.py`
 
