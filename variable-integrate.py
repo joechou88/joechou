@@ -318,6 +318,7 @@ def main():
         print(f"\n========== ▶ 開始處理 {country} ==========")
 
         for start_year, end_year in year_span_list:
+            print("\n" + "-" * 40)
             out_xlsx = create_output_file(country, start_year, end_year)
             if out_xlsx is None:
                 continue   # 這個年度已做過，直接跳過
