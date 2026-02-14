@@ -252,7 +252,7 @@ if __name__ == "__main__":
     sys.stderr = Tee(sys.stderr, log_f)   # 錯誤也寫入 log
     
     print("="*60)
-    print("Variable Integration Log")
+    print("Year Integration Log")
     print("Start Time:", datetime.now())
     print("="*60)
 
