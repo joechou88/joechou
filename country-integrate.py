@@ -41,7 +41,7 @@ print(f"發現 {count} 個 Excel 檔案。")
 if count > 0:
     final_excel_name = f"all-{count}countries.xlsx"
     final_csv_name   = f"all-{count}countries.csv"
-    log_file_name    = f"all-{count}countries_processed_log.txt"
+    log_file_name    = f"all-{count}countries_integrate_log.txt"
 
     output_excel_path = os.path.join(base_path, final_excel_name)
     output_csv_path   = os.path.join(base_path, final_csv_name)

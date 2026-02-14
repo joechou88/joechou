@@ -188,30 +188,114 @@ def read_variable_data(xls_path, sheet_name):
     df = pd.read_excel(xls_path, sheet_name=sheet_name, engine="openpyxl")
     return df
 
-def append_column(out_path, df, sheet_name):
+def append_column(out_path, df, sheet_name, variable_suffix):
     """
-    將單一變數資料貼到 Merged 工作表
-    df: 原工作表 dataframe
-    var_tag: 變數組數（A/B/C…）
+    以 A 欄 Type 當 primary key 合併
     """
+
     wb = load_workbook(out_path)
 
-    # 如果工作表已存在就用原名，否則建立
+    # 讀取現有 sheet
     if sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
-    else:
-        ws = wb.create_sheet(title=sheet_name)
-    
-    if ws.max_column == 1 and ws.cell(row=1, column=1).value is None:
-        new_col_idx = 1   # 如果是空表，就從 A 欄開始  
-    else:
-        new_col_idx = ws.max_column + 1     # 找「下一個空欄」，避免覆蓋
 
-    rows_to_write = dataframe_to_rows(df.iloc[:, 1:], index=False, header=True)
+        data = ws.values
+        columns = next(data)
+        base_df = pd.DataFrame(data, columns=columns)
+
+    else:
+        # 如果不存在，直接寫入
+        base_df = pd.DataFrame()
+
+    # 整理新資料
+    df = df.copy()
+    df.columns = df.columns.astype(str)
+
+    if "Type" not in df.columns:
+        raise ValueError("❌ 新資料沒有 Type 欄")
     
-    for r_idx, row in enumerate(rows_to_write, start=1):
-        for c_idx, value in enumerate(row, start=new_col_idx):
-            ws.cell(row=r_idx, column=c_idx, value=value)
+    df["Type"] = df["Type"].astype(str).str.strip()
+
+    # 如果 base 是空
+    if base_df.empty:
+        merged_df = df
+
+    else:
+        if "Type" not in base_df.columns:
+            raise ValueError("❌ 既有資料沒有 Type 欄")
+        
+        base_df["Type"] = base_df["Type"].astype(str).str.strip()
+        base_df = base_df.dropna(subset=["Type"])
+
+        
+        # 清掉殘留欄位
+        if "_order" in base_df.columns:
+            base_df = base_df.drop(columns="_order")
+
+        # 保留原順序
+        base_df["_order"] = range(len(base_df))
+
+        # 拿新資料「除了 Type 以外」的欄
+        new_cols = [c for c in df.columns if c != "Type"]
+
+        # ========= 公司差異分析 =========
+        base_types = list(base_df["Type"])
+        new_types = list(df["Type"])
+
+        base_index_map = {t: i+2 for i, t in enumerate(base_types)}  # +2 因為 Excel 有表頭
+        new_index_map = {t: i+2 for i, t in enumerate(new_types)}
+
+        set_base = set(base_types)
+        set_new = set(new_types)
+
+        only_in_new = sorted(set_new - set_base)
+        only_in_base = sorted(set_base - set_new)
+
+        merged_df = pd.merge(
+            base_df,
+            df[["Type"] + new_cols],
+            on="Type",
+            how="outer",
+            sort=False
+        )
+
+        # 排序：A 原順序在前，新公司排後
+        merged_df = merged_df.sort_values("_order", na_position="last")
+        merged_df = merged_df.drop(columns=["_order"])
+
+        # 重新建立 index map
+        final_index_map = {
+            t: i+2 for i, t in enumerate(merged_df["Type"])
+        }
+
+        # -------- 新公司 --------
+        for idx, company in enumerate(only_in_new):
+            new_row_position = len(base_types) + idx + 2
+            print(
+                f"新公司 {company} 出現在 {sheet_name}{variable_suffix} 的第 {new_index_map[company]} 列，"
+                f"加進 {sheet_name}A 的第 {final_index_map[company]} 列"
+            )
+
+        # -------- 少公司 --------
+        for company in only_in_base:
+            print(
+                f"公司 {company} 出現在 {sheet_name}A 的第 {base_index_map[company]} 列，"
+                f"但沒有出現在 {sheet_name}{variable_suffix}，"
+                f"該公司 {variable_suffix} 組變數的值全部補 ."
+            )
+
+    # 將 NaN 轉為 "."
+    merged_df = merged_df.fillna(".")
+
+    # 清空舊 sheet
+    if sheet_name in wb.sheetnames:
+        wb.remove(wb[sheet_name])
+
+    ws = wb.create_sheet(title=sheet_name)
+
+    # 寫回
+    for r in dataframe_to_rows(merged_df, index=False, header=True):
+        ws.append(r)
 
     wb.save(out_path)
 
@@ -235,7 +319,7 @@ def update_request_table(out_path, src_path, excel_row):
 
     if n_out != n_src:
         print(
-            f"❌ ROWS 不一致 | "
+            f"⚠️ ROWS 不一致 | "
             f"{os.path.basename(out_path)} N{excel_row}={n_out} | "
             f"{os.path.basename(src_path)} N{excel_row}={n_src}"
         )
@@ -373,7 +457,8 @@ def main():
                         append_column(
                             out_path=out_xlsx,
                             df=df,
-                            sheet_name=sheet_name
+                            sheet_name=sheet_name,
+                            variable_suffix=var
                         )
 
                         if not is_first_variable:
