@@ -12,6 +12,18 @@ LOG_FILE = f"entity_integrate_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt
 
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+# 同時印到終端機 + log 檔案
+class Tee:
+    def __init__(self, *files):
+        self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
 # ================== 檔名解析 ==================
 pattern = re.compile(
     r"""
@@ -334,8 +346,22 @@ def main():
         
         # ===== 回寫 輸出檔 REQUEST_TABLE N 欄（Rows）=====
         ws_req = wb_base[REQUEST_SHEET]
-        for i, total_rows in enumerate(merged_rows_by_year):
-            ws_req[f"N{7+i}"].value = total_rows
+        data_sheets = [s for s in wb_base.sheetnames if s != REQUEST_SHEET]
+
+        for i, ws_name in enumerate(data_sheets):
+            ws = wb_base[ws_name]
+            rows = actual_rows(ws) + 1       # +1 算 header
+            cols = actual_cols(ws)
+            total = rows * cols
+
+            ws_req[f"N{7+i}"].value = rows   # Rows
+            ws_req[f"O{7+i}"].value = cols   # Columns
+            ws_req[f"P{7+i}"].value = total  # Total cells
+
+            print(
+                f"🧮 {out_name} REQUEST_TABLE row {7+i}: "
+                f"N={rows}, O={cols}, P={total}"
+            )
 
         wb_base.save(out_path)
         print(f"✔ 輸出完成：{out_path}")

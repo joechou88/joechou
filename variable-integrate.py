@@ -203,16 +203,14 @@ def read_variable_data(xls_path, sheet_name):
     df = pd.read_excel(xls_path, sheet_name=sheet_name, engine="openpyxl")
     return df
 
-def append_column(out_path, df, sheet_name, variable_suffix):
+def append_column(wb_out, df, sheet_name, variable_suffix):
     """
     以 A 欄 Type 當 primary key 合併
     """
 
-    wb = load_workbook(out_path)
-
     # 讀取現有 sheet
-    if sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
+    if sheet_name in wb_out.sheetnames:
+        ws = wb_out[sheet_name]
 
         data = ws.values
         columns = next(data)
@@ -303,24 +301,21 @@ def append_column(out_path, df, sheet_name, variable_suffix):
     merged_df = merged_df.fillna(".")
 
     # 清空舊 sheet
-    if sheet_name in wb.sheetnames:
-        wb.remove(wb[sheet_name])
+    if sheet_name in wb_out.sheetnames:
+        wb_out.remove(wb_out[sheet_name])
 
-    ws = wb.create_sheet(title=sheet_name)
+    ws = wb_out.create_sheet(title=sheet_name)
 
     # 寫回
     for r in dataframe_to_rows(merged_df, index=False, header=True):
         ws.append(r)
 
-    wb.save(out_path)
-
-def update_request_table(out_path, src_path, excel_row):
+def update_request_table(wb_out, src_path, out_path, excel_row, sheet_name):
     """
-    將 src_path 的 REQUEST_TABLE 中
-    對應 year 的 O/P 欄，加到 out_path 的 REQUEST_TABLE
+    先檢查 N 欄是否與來源檔一致，
+    再以合併後的 sheet 實際資料計算 N/O/P，更新 REQUEST_TABLE，
     並印出加總過程
     """
-    wb_out = load_workbook(out_path)
     wb_src = load_workbook(src_path)
 
     ws_out = wb_out["REQUEST_TABLE"]
@@ -339,20 +334,44 @@ def update_request_table(out_path, src_path, excel_row):
             f"{os.path.basename(src_path)} N{excel_row}={n_src}"
         )
 
-    for col, label in [(15, "O"), (16, "P")]:
-        v_out = ws_out.cell(row=excel_row, column=col).value or 0
-        v_src = ws_src.cell(row=excel_row, column=col).value or 0
-        new_v = v_out + v_src
+    # ========= 以合併後 sheet 的實際 shape 更新 =========
+    ws_data = wb_out[sheet_name]
 
-        print(
-            f"🧮 {os.path.basename(out_path)} "
-            f"REQUEST_TABLE {label}{excel_row}: "
-            f"{v_out} + {v_src} = {new_v}"
-        )
+    rows = actual_rows(ws_data) + 1  # header 算一列
+    cols = actual_cols(ws_data)
+    total = rows * cols
 
-        ws_out.cell(row=excel_row, column=col, value=new_v)
+    ws_out[f"N{excel_row}"].value = rows
+    ws_out[f"O{excel_row}"].value = cols
+    ws_out[f"P{excel_row}"].value = total
 
-    wb_out.save(out_path)
+    print(f"🧮 更新 REQUEST_TABLE {sheet_name} row {excel_row}: "
+          f"N={rows}, O={cols}, P={total}")
+
+def actual_rows(ws):
+    """
+    計算實際有資料的 row 數（忽略尾端空白列）
+    """
+    last = 0
+    for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=1):
+        if any(cell is not None for cell in row):
+            last = i
+    return last
+
+def actual_cols(ws):
+    """
+    計算實際有資料的欄位數（忽略尾端空欄）
+    """
+    max_cols = 0
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row:
+            continue
+        # 找最後一個非 None 的 index
+        for i in range(len(row), 0, -1):
+            if row[i-1] is not None:
+                max_cols = max(max_cols, i)
+                break
+    return max_cols
 
 def main():
     files = [f for f in os.listdir(DATA_SRC) if f.endswith((".xlsx", ".xlsm"))]
@@ -421,6 +440,7 @@ def main():
             out_xlsx = create_output_file(country, start_year, end_year)
             if out_xlsx is None:
                 continue   # 這個年度已做過，直接跳過
+            wb_out = load_workbook(out_xlsx)
             skip_country = False
 
             # 篩選這個 block 的檔案
@@ -470,7 +490,7 @@ def main():
                             continue
 
                         append_column(
-                            out_path=out_xlsx,
+                            wb_out=wb_out,
                             df=df,
                             sheet_name=sheet_name,
                             variable_suffix=var
@@ -478,14 +498,18 @@ def main():
 
                         if not is_first_variable:
                             update_request_table(
-                                out_path=out_xlsx,
+                                wb_out=wb_out,
                                 src_path=src_path,
-                                excel_row=excel_row
+                                out_path=out_xlsx,
+                                excel_row=excel_row,
+                                sheet_name=sheet_name
                             )
                     except Exception as e:
                         print(f"⚠️ ERROR: {e}")
                         skip_country = True
                         break   # 跳出 var 迴圈，外層會處理刪檔 + 換國
+            
+            wb_out.save(out_xlsx)   
 
             if skip_country:
                 if os.path.exists(out_xlsx):
