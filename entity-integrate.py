@@ -1,11 +1,14 @@
 import re
 import os
+import sys
+from datetime import datetime
 from openpyxl import load_workbook
 
 # ================== 設定 ==================
 INPUT_FOLDER = "data-split-by-entity"
 OUTPUT_FOLDER = "data-split-by-variable"
 REQUEST_SHEET = "REQUEST_TABLE"
+LOG_FILE = f"entity_integrate_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
@@ -181,170 +184,193 @@ def append_sheet_rows(target_ws, source_ws, fname_only, base_cols_by_year, src_c
     
     return True
 
-# ================== 主流程 ==================
-try:
-    expected_company_count = int(
-        input("🧩 請輸入每個國家預期的公司群數（例如 8）: ").strip()
-    )
-    if expected_company_count < 1:
-        raise ValueError
-except ValueError:
-    print("❌ 請輸入大於等於 1 的整數")
-    exit(1)
-
-files = [
-    f for f in os.listdir(INPUT_FOLDER)
-    if f.endswith((".xlsx", ".xlsm"))
-]
-
-groups = {}
-key_to_outname = {}
-
-for f in files:
-    info = parse_filename(f)
-    if not info:
-        continue
-    key = (
-        info["country"],
-        info["start"],
-        info["end"],
-        info["suffix"]
-    )
-    groups.setdefault(key, []).append((int(info["company"]), f))
-
-    if key not in key_to_outname:
-        out_name = f"{info['country']}-{info['start']}{'-'+info['end'] if info['end'] else ''}{info['suffix']}.xlsx"
-        key_to_outname[key] = out_name
-
-missing_company_report = []
-existing_outputs = []
-
-for (country, start, end, suffix) in groups.keys():
-    out_name = key_to_outname[(country, start, end, suffix)]
-    out_path = os.path.join(OUTPUT_FOLDER, out_name)
-
-    if os.path.exists(out_path):
-        existing_outputs.append(out_path)
-
-if existing_outputs:
-    print("\n⚠️  以下輸出檔案已存在，將被覆蓋：")
-    for p in existing_outputs:
-        print(f"   - {p}")
-
-    ans = input("\n是否同意刪除並全部重生？(y/N): ").strip().lower()
-
-    if ans not in ("y", "yes"):
-        print(
-            "\n❌ 已取消執行。\n"
-            "請自行到 ./data-split-by-variable 刪除上述檔案後再重新執行。"
+def main():
+    try:
+        expected_company_count = int(
+            input("🧩 請輸入每個國家預期的公司群數（例如 8）: ").strip()
         )
+        if expected_company_count < 1:
+            raise ValueError
+    except ValueError:
+        print("❌ 請輸入大於等於 1 的整數")
         exit(1)
 
-    for p in existing_outputs:
-        os.remove(p)
-        print(f"🗑 已刪除：{p}")
-    print(f"\n========================\n")
+    files = [
+        f for f in os.listdir(INPUT_FOLDER)
+        if f.endswith((".xlsx", ".xlsm"))
+    ]
 
-for (country, start, end, suffix), items in groups.items():    
-    companies = {company: fname for company, fname in items}
-    actual_companies = set(companies.keys())
-    expected_companies = set(range(1, expected_company_count + 1))
-    missing_companies = sorted(expected_companies - actual_companies)
+    groups = {}
+    key_to_outname = {}
 
-    if missing_companies:
-        missing_company_report.append({
-            "country": country,
-            "period": f"{start}{'-' + end if end else ''}{suffix}",
-            "missing": missing_companies
-        })
-
-    # ===== 嚴格檢查：一定要有 company = 1 作為模板 =====
-    if 1 not in companies:
-        raise ValueError(
-            f"缺少 company=1，無法合併：{country}-{start}{'-'+end if end else ''}{suffix}"
-        )
-
-    base_company = 1
-    base_file = os.path.join(INPUT_FOLDER, companies[1])
-
-    wb_base = load_workbook(base_file, data_only=True)
-    years = 1 if end is None else int(end) - int(start) + 1
-    merged_rows_by_year = [0] * years
-
-    validate_wb(wb_base, base_file, base_company, start, end, years)
-    print_sheet_shapes(wb_base, companies[1])
-
-    # ===== 先計入 base company 自己的 rows =====
-    base_sheet_names = [s for s in wb_base.sheetnames if s != REQUEST_SHEET]
-
-    for year_idx, ws_name in enumerate(base_sheet_names):
-        ws = wb_base[ws_name]
-        rows = actual_rows(ws)
-        merged_rows_by_year[year_idx] += rows + 1
-
-    for company in sorted(companies):
-        if company == 1:
+    for f in files:
+        info = parse_filename(f)
+        if not info:
             continue
-        fname_only = companies[company]
-        fname = os.path.join(INPUT_FOLDER, fname_only)
-        wb_src = load_workbook(fname, data_only=True)
+        key = (
+            info["country"],
+            info["start"],
+            info["end"],
+            info["suffix"]
+        )
+        groups.setdefault(key, []).append((int(info["company"]), f))
 
-        ws_req_base = wb_base[REQUEST_SHEET]
-        ws_req_src = wb_src[REQUEST_SHEET]
+        if key not in key_to_outname:
+            out_name = f"{info['country']}-{info['start']}{'-'+info['end'] if info['end'] else ''}{info['suffix']}.xlsx"
+            key_to_outname[key] = out_name
 
-        base_cols_by_year = get_request_table_value(ws_req_base, "O")
-        src_cols_by_year = get_request_table_value(ws_req_src, "O")
+    missing_company_report = []
+    existing_outputs = []
 
+    for (country, start, end, suffix) in groups.keys():
+        out_name = key_to_outname[(country, start, end, suffix)]
+        out_path = os.path.join(OUTPUT_FOLDER, out_name)
 
-        validate_wb(wb_src, fname, company, start, end, years)
+        if os.path.exists(out_path):
+            existing_outputs.append(out_path)
 
-        for ws_name in wb_base.sheetnames:
-            # 跳過 REQUEST_TABLE
-            if ws_name == REQUEST_SHEET:
-                continue
+    if existing_outputs:
+        print("\n⚠️  以下輸出檔案已存在，將被覆蓋：")
+        for p in existing_outputs:
+            print(f"   - {p}")
 
-            ws_base = wb_base[ws_name]
-            ws_src = wb_src[ws_name]
+        ans = input("\n是否同意刪除並全部重生？(y/N): ").strip().lower()
 
-            rows = actual_rows(ws_src)
-            cols = actual_cols(ws_src)
-
-            year_idx = list(
-                s for s in wb_base.sheetnames if s != REQUEST_SHEET
-            ).index(ws_name)
-
+        if ans not in ("y", "yes"):
             print(
-                f"{fname_only} 🔹 工作表: {ws_name}, "
-                f"shape: {rows} rows x {cols} columns"
+                "\n❌ 已取消執行。\n"
+                "請自行到 ./data-split-by-variable 刪除上述檔案後再重新執行。"
+            )
+            exit(1)
+
+        for p in existing_outputs:
+            os.remove(p)
+            print(f"🗑 已刪除：{p}")
+        print(f"\n========================\n")
+
+    for (country, start, end, suffix), items in groups.items():    
+        companies = {company: fname for company, fname in items}
+        actual_companies = set(companies.keys())
+        expected_companies = set(range(1, expected_company_count + 1))
+        missing_companies = sorted(expected_companies - actual_companies)
+
+        if missing_companies:
+            missing_company_report.append({
+                "country": country,
+                "period": f"{start}{'-' + end if end else ''}{suffix}",
+                "missing": missing_companies
+            })
+
+        # ===== 嚴格檢查：一定要有 company = 1 作為模板 =====
+        if 1 not in companies:
+            raise ValueError(
+                f"缺少 company=1，無法合併：{country}-{start}{'-'+end if end else ''}{suffix}"
             )
 
-            appended = append_sheet_rows(ws_base, ws_src, fname_only, base_cols_by_year, src_cols_by_year, year_idx)
+        base_company = 1
+        base_file = os.path.join(INPUT_FOLDER, companies[1])
 
-            if appended:
-                merged_rows_by_year[year_idx] += rows
+        wb_base = load_workbook(base_file, data_only=True)
+        years = 1 if end is None else int(end) - int(start) + 1
+        merged_rows_by_year = [0] * years
 
-    out_name = key_to_outname[(country, start, end, suffix)]
-    out_path = os.path.join(OUTPUT_FOLDER, out_name)
+        validate_wb(wb_base, base_file, base_company, start, end, years)
+        print_sheet_shapes(wb_base, companies[1])
 
-    print(f"\n📊 {out_name} 最終合併後 sheet shape：")
-    print_sheet_shapes(wb_base, out_name)
+        # ===== 先計入 base company 自己的 rows =====
+        base_sheet_names = [s for s in wb_base.sheetnames if s != REQUEST_SHEET]
+
+        for year_idx, ws_name in enumerate(base_sheet_names):
+            ws = wb_base[ws_name]
+            rows = actual_rows(ws)
+            merged_rows_by_year[year_idx] += rows + 1
+
+        for company in sorted(companies):
+            if company == 1:
+                continue
+            fname_only = companies[company]
+            fname = os.path.join(INPUT_FOLDER, fname_only)
+            wb_src = load_workbook(fname, data_only=True)
+
+            ws_req_base = wb_base[REQUEST_SHEET]
+            ws_req_src = wb_src[REQUEST_SHEET]
+
+            base_cols_by_year = get_request_table_value(ws_req_base, "O")
+            src_cols_by_year = get_request_table_value(ws_req_src, "O")
+
+
+            validate_wb(wb_src, fname, company, start, end, years)
+
+            for ws_name in wb_base.sheetnames:
+                # 跳過 REQUEST_TABLE
+                if ws_name == REQUEST_SHEET:
+                    continue
+
+                ws_base = wb_base[ws_name]
+                ws_src = wb_src[ws_name]
+
+                rows = actual_rows(ws_src)
+                cols = actual_cols(ws_src)
+
+                year_idx = list(
+                    s for s in wb_base.sheetnames if s != REQUEST_SHEET
+                ).index(ws_name)
+
+                print(
+                    f"{fname_only} 🔹 工作表: {ws_name}, "
+                    f"shape: {rows} rows x {cols} columns"
+                )
+
+                appended = append_sheet_rows(ws_base, ws_src, fname_only, base_cols_by_year, src_cols_by_year, year_idx)
+
+                if appended:
+                    merged_rows_by_year[year_idx] += rows
+
+        out_name = key_to_outname[(country, start, end, suffix)]
+        out_path = os.path.join(OUTPUT_FOLDER, out_name)
+
+        print(f"\n📊 {out_name} 最終合併後 sheet shape：")
+        print_sheet_shapes(wb_base, out_name)
+        
+        # ===== 回寫 輸出檔 REQUEST_TABLE N 欄（Rows）=====
+        ws_req = wb_base[REQUEST_SHEET]
+        for i, total_rows in enumerate(merged_rows_by_year):
+            ws_req[f"N{7+i}"].value = total_rows
+
+        wb_base.save(out_path)
+        print(f"✔ 輸出完成：{out_path}")
+        print(f"\n========================\n")
+
+    if missing_company_report:
+        print("\n⚠️ 公司群數量警示（不影響輸出）")
+        print("====================================")
+        for item in missing_company_report:
+            print(
+                f"{item['country']}-{item['period']} "
+                f"缺少公司群：{', '.join(map(str, item['missing']))}"
+            )
+    else:
+        print("\n✅ 所有國家公司群數量皆符合預期")
+
+if __name__ == "__main__":
+    # 開啟 log（每次覆寫；若想改成累加，用 "a"）
+    log_f = open(LOG_FILE, "w", encoding="utf-8")
+
+    sys.stdout = Tee(sys.stdout, log_f)
+    sys.stderr = Tee(sys.stderr, log_f)   # 錯誤也寫入 log
     
-    # ===== 回寫 輸出檔 REQUEST_TABLE N 欄（Rows）=====
-    ws_req = wb_base[REQUEST_SHEET]
-    for i, total_rows in enumerate(merged_rows_by_year):
-        ws_req[f"N{7+i}"].value = total_rows
+    print("="*60)
+    print("Variable Integration Log")
+    print("Start Time:", datetime.now())
+    print("="*60)
 
-    wb_base.save(out_path)
-    print(f"✔ 輸出完成：{out_path}")
-    print(f"\n========================\n")
-
-if missing_company_report:
-    print("\n⚠️ 公司群數量警示（不影響輸出）")
-    print("====================================")
-    for item in missing_company_report:
-        print(
-            f"{item['country']}-{item['period']} "
-            f"缺少公司群：{', '.join(map(str, item['missing']))}"
-        )
-else:
-    print("\n✅ 所有國家公司群數量皆符合預期")
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        print("\n❌ 系統發生未預期錯誤：")
+        traceback.print_exc()
+    finally:
+        print("\nEnd Time:", datetime.now())
+        print("="*60)
+        log_f.close()

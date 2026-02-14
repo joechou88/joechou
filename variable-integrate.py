@@ -1,5 +1,7 @@
 import os
 import re
+import sys
+from datetime import datetime
 import pandas as pd
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -7,8 +9,21 @@ from collections import defaultdict
 
 DATA_SRC = "./data-split-by-variable"
 DATA_OUT = "./data"
+LOG_FILE = f"variable_integrate_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 
 os.makedirs(DATA_OUT, exist_ok=True)
+
+# 同時印到終端機 + log 檔案
+class Tee:
+    def __init__(self, *files):
+        self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()
+    def flush(self):
+        for f in self.files:
+            f.flush()
 
 def parse_filename(fname):
     """
@@ -481,4 +496,24 @@ def main():
     print("🎉 所有國家/年度整合完成！")
 
 if __name__ == "__main__":
-    main()
+    # 開啟 log（每次覆寫；若想改成累加，用 "a"）
+    log_f = open(LOG_FILE, "w", encoding="utf-8")
+
+    sys.stdout = Tee(sys.stdout, log_f)
+    sys.stderr = Tee(sys.stderr, log_f)   # 錯誤也寫入 log
+    
+    print("="*60)
+    print("Variable Integration Log")
+    print("Start Time:", datetime.now())
+    print("="*60)
+
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        print("\n❌ 系統發生未預期錯誤：")
+        traceback.print_exc()
+    finally:
+        print("\nEnd Time:", datetime.now())
+        print("="*60)
+        log_f.close()
