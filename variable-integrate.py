@@ -227,7 +227,9 @@ def append_column(wb_out, df, sheet_name, variable_suffix):
     if "Type" not in df.columns:
         raise ValueError("❌ 新資料沒有 Type 欄")
     
-    df["Type"] = df["Type"].astype(str).str.strip()
+    df = df.dropna(subset=["Type"])     # 丟掉空值
+    df["Type"] = df["Type"].astype(str).str.strip()     # 轉字串
+    df = df[df["Type"] != ""]       # 丟掉空字串
 
     # 如果 base 是空
     if base_df.empty:
@@ -237,9 +239,9 @@ def append_column(wb_out, df, sheet_name, variable_suffix):
         if "Type" not in base_df.columns:
             raise ValueError("❌ 既有資料沒有 Type 欄")
         
-        base_df["Type"] = base_df["Type"].astype(str).str.strip()
-        base_df = base_df.dropna(subset=["Type"])
-
+        base_df = base_df.dropna(subset=["Type"])     # 丟掉空值
+        base_df["Type"] = base_df["Type"].astype(str).str.strip()     # 轉字串
+        base_df = base_df[base_df["Type"] != ""]       # 丟掉空字串
         
         # 清掉殘留欄位
         if "_order" in base_df.columns:
